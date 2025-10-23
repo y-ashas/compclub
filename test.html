@@ -1,1 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Mini Clash Royale 3D — By The Computer Boyz</title>
+  <!-- Three.js + OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    :root {
+      --bg: #111;
+      --panel: #1b1b1b;
+      --text: #fff;
+      --accent: #6cf;
+      --danger: #ff4d4f;
+      --success: #48d165;
+      --gold: #ffcf40;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
+      overflow: hidden;
+    }
+    /* ===== LOADING / MENU ===== */
+    #loadingScreen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(1200px 600px at 50% 30%, #1e293b 0%, #090e1a 40%, #000 100%);
+      z-index: 1000;
+      text-align: center;
+      padding: 24px;
+    }
+    #loadingScreen h1 {
+      font-size: 44px;
+      margin: 0;
+      letter-spacing: 1px;
+    }
+    #loadingScreen h2 {
+      margin: 0;
+      font-weight: 600;
+      color: var(--gold);
+    }
+    #rules {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px 20px;
+      max-width: 720px;
+      text-align: left;
+    }
+    #rules h3 { margin: 0 0 8px 0; }
+    #rules ul { margin: 8px 0 0 16px; line-height: 1.5; }
+    .menuRow { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: linear-gradient(180deg, #293241, #1f2633);
+      color: white;
+      padding: 10px 16px;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.35); }
+    .btn:active { transform: translateY(0); }
+    .btn.gold { background: linear-gradient(180deg, #ffd86a, #e3ac2b); color:#221; }
+    .btn.red { background: linear-gradient(180deg, #ff6a6a, #d23333); }
+    .hidden { display: none !important; }
+    /* ===== HUD / GAME UI ===== */
+    #hudTop, #hudBottom {
+      position: fixed; left: 0; width: 100%;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px; font-weight: 600;
+      pointer-events: none;
+    }
+    #hudTop { top: 0; background: linear-gradient(180deg, rgba(0,0,0,0.65), rgba(0,0,0,0)); }
+    #hudBottom { bottom: 0; background: linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0)); }
+    .crowns {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.07);
+      padding: 6px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .crown {
+      width: 18px; height: 18px; border-radius: 4px; background: rgba(255,255,255,0.12); position: relative;
+    }
+    .crown.filled { background: var(--gold); }
+    .infoBox {
+      background: rgba(255,255,255,0.07);
+      padding: 6px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    /* Elixir bars */
+    .elixirWrap { display: flex; align-items: center; gap: 8px; }
+    .bar {
+      width: 160px; height: 14px; background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 999px; overflow: hidden;
+    }
+    .barFill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      transition: width .2s ease;
+    }
+    .hand {
+      pointer-events: auto;
+      display: grid; grid-template-columns: repeat(4, minmax(60px, 1fr)); gap: 8px;
+      padding: 8px; border-radius: 12px;
+      background: rgba(20, 20, 28, 0.9); border: 1px solid rgba(255,255,255,0.12);
+      width: min(560px, 92vw);
+      margin: 0 auto;
+    }
+    .card {
+      border: 1px solid rgba(255,255,255,0.2);
+      background: #2a2f3a; border-radius: 10px;
+      height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      cursor: grab; position: relative;
+      user-select: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    .card.disabled { opacity: .4; cursor: not-allowed; filter: grayscale(0.2); }
+    .cost {
+      position: absolute; right: 6px; bottom: 6px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px; padding: 2px 6px; font-size: 11px;
+    }
+    .row {
+      display: flex; width: 100%; justify-content: center; pointer-events: none;
+    }
+    /* Top player's hand (mirrored) */
+    #topControls { position: fixed; top: 54px; left: 0; width: 100%; display: none; }
+    #bottomControls { position: fixed; bottom: 54px; left: 0; width: 100%; display: none; }
+    /* Drop zone helper canvases */
+    #overlay2D, #hpCanvas {
+      position: fixed; inset: 0; pointer-events: none;
+    }
+    /* Result banner */
+    #resultBanner {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 999;
+      background: rgba(0,0,0,0.6);
+      font-size: 42px; font-weight: 900;
+      text-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    }
+    /* Lane selection UI */
+    #laneSelection {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(20, 20, 28, 0.9);
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      z-index: 10;
+    }
+    .laneBtn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: #2a2f3a;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .laneBtn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .laneBtn.active {
+      background: var(--accent);
+      color: black;
+    }
+    /* Small helpers */
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #222; border: 1px solid #444; border-bottom-width: 2px; border-radius: 6px; padding: 2px 6px;
+      font-size: 12px; color: #ddd;
+    }
+    /* New UI Elements */
+    #minimap {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0,0,0,0.7);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      z-index: 100;
+    }
+    #surrenderBtn {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      z-index: 100;
+      display: none;
+    }
+    #suddenDeath {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 60px;
+      font-weight: 900;
+      color: var(--danger);
+      text-shadow: 0 0 20px rgba(255,0,0,0.7);
+      z-index: 200;
+      display: none;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.1); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    .particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    #gameStats {
+      position: fixed;
+      top: 70px;
+      left: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 100;
+      display: none;
+    }
+    #gameStats div {
+      margin: 5px 0;
+    }
+    .attackEffect {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: attackPulse 0.5s forwards;
+    }
+    @keyframes attackPulse {
+      0% { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== LOADING / MENU SCREEN ===== -->
+  <div id="loadingScreen">
+    <h1>Mini Clash Royale 3D</h1>
+    <h2>By The Computer Boyz</h2>
+    <div id="rules">
+      <h3>📜 Rules</h3>
+      <ul>
+        <li>Destroy the enemy <b>King's Tower</b> for an instant <b>3-crown</b> win.</li>
+        <li>Otherwise, earn more crowns by destroying <b>Princess Towers</b>.</li>
+        <li>Match time: <b>3:00</b> (last minute is <b>Double Elixir</b>) + <b>2:00 Overtime</b>
+          (<b>Double</b> for 60s, then <b>Triple</b> for 60s) — <b>Sudden Death</b>: first tower falls wins.</li>
+        <li>Play cards from your <b>4-card hand</b>. As you play a card, it cycles from your <b>8-card deck</b>.</li>
+        <li>Drag a card onto your half to deploy. Placement and timing matter!</li>
+        <li>After destroying a princess tower, units will turn and attack the king's tower.</li>
+      </ul>
+      <p class="infoBox">Tips: defend efficiently to gain <b>elixir advantage</b>, then counter-push. Center placements let both Princess Towers assist.</p>
+    </div>
+    <div class="menuRow">
+      <button class="btn gold" onclick="selectMode('bot')">Single Player (vs Bot)</button>
+      <button class="btn" onclick="selectMode('multi')">Multiplayer (same screen)</button>
+    </div>
+  </div>
+  <!-- ===== HUD ===== -->
+  <div id="hudTop">
+    <div class="crowns" id="p2Crowns">
+      <span>Enemy Crowns</span>
+      <div class="crown" id="p2c1"></div>
+      <div class="crown" id="p2c2"></div>
+      <div class="crown" id="p2c3"></div>
+    </div>
+    <div class="infoBox" id="timerBox">03:00</div>
+    <div class="elixirWrap">
+      <span>Enemy Elixir</span>
+      <div class="bar"><div class="barFill" id="p2ElixirFill"></div></div>
+    </div>
+  </div>
+  <div id="hudBottom">
+    <div class="elixirWrap">
+      <span>Your Elixir</span>
+      <div class="bar"><div class="barFill" id="p1ElixirFill"></div></div>
+    </div>
+    <div class="infoBox" id="phaseBox">Single</div>
+    <div class="crowns" id="p1Crowns">
+      <span>Your Crowns</span>
+      <div class="crown" id="p1c1"></div>
+      <div class="crown" id="p1c2"></div>
+      <div class="crown" id="p1c3"></div>
+    </div>
+  </div>
+  <!-- ===== LANE SELECTION ===== -->
+  <div id="laneSelection" class="hidden">
+    <button class="laneBtn" data-lane="0">Left Lane</button>
+    <button class="laneBtn" data-lane="1">Right Lane</button>
+  </div>
+  <!-- ===== HANDS ===== -->
+  <div id="topControls">
+    <div class="row">
+      <div class="hand" id="p2Hand"></div>
+    </div>
+  </div>
+  <div id="bottomControls">
+    <div class="row">
+      <div class="hand" id="p1Hand"></div>
+    </div>
+  </div>
+  <!-- The 3D canvas (Three.js) is injected into body. We also add: -->
+  <canvas id="overlay2D"></canvas>    <!-- For drag area guides -->
+  <canvas id="hpCanvas"></canvas>     <!-- For 2D HP bars over 3D -->
+  <canvas id="minimap"></canvas>      <!-- Minimap -->
+  <div id="suddenDeath">SUDDEN DEATH</div>
+  <div id="gameStats">
+    <div>Units: <span id="unitCount">0</span></div>
+    <div>Towers: <span id="towerCount">6</span></div>
+    <div>Time: <span id="gameTime">0:00</span></div>
+  </div>
+  <button id="surrenderBtn" class="btn red">Surrender</button>
+  <!-- Result banner -->
+  <div id="resultBanner"></div>
+<script>
+/* ============================================================
+   GLOBALS & CONSTANTS
+============================================================ */
+let scene, camera, renderer, controls, clock;
+let overlay2D = document.getElementById('overlay2D');
+let hpCanvas  = document.getElementById('hpCanvas');
+let minimapCanvas = document.getElementById('minimap');
+let octx = overlay2D.getContext('2d');
+let hctx = hpCanvas.getContext('2d');
+let mctx = minimapCanvas.getContext('2d');
+const STATE = {
+  mode: null,           // "bot" | "multi"
+  started: false,
+  gameOver: false,
+  inOvertime: false,
+  suddenDeath: false,
+  suddenDeathAnnounced: false,
+  elapsed: 0,           // seconds since start
+  // Timing: 3:00 base + 2:00 overtime
+  baseTime: 180,        // 3 minutes
+  overtimeTime: 120,    // 2 minutes
+  selectedLane: 0,      // Default to left lane
+  particles: [],        // For visual effects
+  stats: {
+    unitsDeployed: 0,
+    towersDestroyed: 0,
+    damageDealt: 0
+  }
+};
+// Only two lanes now (left and right)
+const LANES_X = [-4, 4];           // Two lanes across X axis
+const ARENA = { width: 14, height: 26 }; // Plane size (X, Z)
+const DEPLOY_Z = {                      // Player halves
+  P1_MIN: 0, P1_MAX: 11.5,             // bottom half (z positive)
+  P2_MIN: -11.5, P2_MAX: 0             // top half (z negative)
+};
+const MAX_ELIXIR = 10;
+const HAND_SIZE = 4;
+const DECK_SIZE = 8;
+const TROOPS = [
+  { key: 'knight', name: "Knight",   hp: 1000, speed: 1.8, atk: 120,  range: 1.7,  cost: 3, color: 0x4f7cff, size: 0.45, sprite: '🔵' },
+  { key: 'archer', name: "Archer",   hp: 230,  speed: 2.4, atk: 70,   range: 5.5,  cost: 2, color: 0x24e3ff, size: 0.35, sprite: '🏹' },
+  { key: 'giant',  name: "Giant",    hp: 2600, speed: 1.2, atk: 140,  range: 1.7,  cost: 5, color: 0x9a62ff, size: 0.6,  buildingTarget: true, sprite: '🟣' },
+  { key: 'goblin', name: "Goblin",   hp: 180,  speed: 3.2, atk: 85,   range: 1.6,  cost: 2, color: 0x00ff7f, size: 0.3,  sprite: '🟢' },
+  { key: 'wizard', name: "Wizard",   hp: 430,  speed: 2.0, atk: 170,  range: 6.0,  cost: 4, color: 0xffa64d, size: 0.38, splash: true, sprite: '🧙' },
+  { key: 'bomber', name: "Bomber",   hp: 220,  speed: 2.2, atk: 140,  range: 4.6,  cost: 3, color: 0xffef5a, size: 0.34, splash: true, sprite: '💣' },
+  { key: 'mini',   name: "Mini P.E.K.K.A", hp: 420, speed: 1.7, atk: 230, range: 1.7, cost: 4, color: 0xff6abf, size: 0.42, sprite: '⚔️' },
+  { key: 'valk',   name: "Valkyrie", hp: 1250, speed: 1.8, atk: 160,  range: 2.2,  cost: 4, color: 0xff5a5a, size: 0.5, spin: true, sprite: '⚔️' },
+];
+// quick lookup by key
+const TROOP_BY_KEY = Object.fromEntries(TROOPS.map(t=>[t.key,t]));
+const PHASES = {
+  REGULAR: 'Regular',
+  DOUBLE: 'Double',
+  TRIPLE: 'Triple',
+};
+// Sprite textures (using emojis as placeholders)
+const spriteTextures = {};
+/* ============================================================
+   THREE.JS SCENE SETUP
+============================================================ */
+function initThree() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0d12);
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
+  camera.position.set(12, 14, 20);
+  camera.lookAt(0, 0, 0);
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.minDistance = 12;
+  controls.maxDistance = 28;
+  // Lights
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x333344, 0.7);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+  dir.position.set(10, 18, 8);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(2048, 2048);
+  scene.add(dir);
+  // Create detailed arena
+  createArena();
+  // Save plane for raycast
+  const arenaPlane = scene.children.find(o=>o.name==='arenaPlane');
+  // Resize helpers
+  window.addEventListener('resize', onResize);
+  onResize();
+  clock = new THREE.Clock();
+}
+function createArena() {
+  // Main arena plane - now green like grass
+  const planeGeo = new THREE.PlaneGeometry(ARENA.width, ARENA.height);
+  const planeMat = new THREE.MeshStandardMaterial({
+    color: 0x2e7d32,
+    roughness: 0.9,
+    metalness: 0.05
+  });
+  const arena = new THREE.Mesh(planeGeo, planeMat);
+  arena.rotation.x = -Math.PI/2;
+  arena.receiveShadow = true;
+  arena.name = 'arenaPlane';
+  scene.add(arena);
+  // River / Bridge area
+  const riverWidth = 2.5;
+  const riverGeo = new THREE.PlaneGeometry(ARENA.width, riverWidth);
+  const riverMat = new THREE.MeshStandardMaterial({
+    color: 0x2d4b8f,
+    roughness: 0.3,
+    metalness: 0.2
+  });
+  const river = new THREE.Mesh(riverGeo, riverMat);
+  river.rotation.x = -Math.PI/2;
+  river.position.y = 0.02;
+  river.receiveShadow = true;
+  scene.add(river);
+  // Bridges
+  const bridgeWidth = 1.8;
+  const bridgeHeight = 0.3;
+  const bridgeGeo = new THREE.BoxGeometry(bridgeWidth, bridgeHeight, riverWidth);
+  const bridgeMat = new THREE.MeshStandardMaterial({
+    color: 0x8b5a2b,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+  
+  // Left bridge
+  const leftBridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+  leftBridge.position.set(-4, bridgeHeight/2, 0);
+  leftBridge.castShadow = true;
+  leftBridge.receiveShadow = true;
+  scene.add(leftBridge);
+  
+  // Right bridge
+  const rightBridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+  rightBridge.position.set(4, bridgeHeight/2, 0);
+  rightBridge.castShadow = true;
+  rightBridge.receiveShadow = true;
+  scene.add(rightBridge);
+  // Lane lines - only two lanes now
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x5a6472, transparent: true, opacity: 0.7 });
+  LANES_X.forEach(x => {
+    const points = [ new THREE.Vector3(x, 0.01, -ARENA.height/2), new THREE.Vector3(x, 0.01, ARENA.height/2) ];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geo, lineMat);
+    scene.add(line);
+  });
+  // River / Bridge line (center)
+  {
+    const points = [ new THREE.Vector3(-ARENA.width/2, 0.01, 0), new THREE.Vector3(ARENA.width/2, 0.01, 0) ];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const centerLine = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x8892a6, transparent: true, opacity: 0.6 }));
+    scene.add(centerLine);
+  }
+  // Decorative elements - trees and rocks around the arena
+  createDecorations();
+}
+function createDecorations() {
+  // Add some trees around the arena
+  const treePositions = [
+    { x: -8, z: -13 }, { x: 8, z: -13 },
+    { x: -8, z: 13 }, { x: 8, z: 13 },
+    { x: -10, z: -10 }, { x: 10, z: -10 },
+    { x: -10, z: 10 }, { x: 10, z: 10 }
+  ];
+  treePositions.forEach(pos => {
+    const treeTrunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8),
+      new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 })
+    );
+    treeTrunk.position.set(pos.x, 0.75, pos.z);
+    treeTrunk.castShadow = true;
+    treeTrunk.receiveShadow = true;
+    scene.add(treeTrunk);
+    const treeTop = new THREE.Mesh(
+      new THREE.SphereGeometry(1.2, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.7 })
+    );
+    treeTop.position.set(pos.x, 2.2, pos.z);
+    treeTop.castShadow = true;
+    scene.add(treeTop);
+  });
+  // Add some rocks
+  const rockPositions = [
+    { x: -11, z: -5, s: 0.8 }, { x: 11, z: -5, s: 0.8 },
+    { x: -11, z: 5, s: 0.8 }, { x: 11, z: 5, s: 0.8 },
+    { x: -6, z: -12, s: 0.6 }, { x: 6, z: -12, s: 0.6 },
+    { x: -6, z: 12, s: 0.6 }, { x: 6, z: 12, s: 0.6 }
+  ];
+  rockPositions.forEach(pos => {
+    const rock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(pos.s, 0),
+      new THREE.MeshStandardMaterial({ color: 0x616161, roughness: 0.8, metalness: 0.2 })
+    );
+    rock.position.set(pos.x, pos.s/2, pos.z);
+    rock.castShadow = true;
+  });
+}
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+  overlay2D.width = w;
+  overlay2D.height = h;
+  hpCanvas.width = w;
+  hpCanvas.height = h;
+  minimapCanvas.width = 150;
+  minimapCanvas.height = 150;
+}
+/* ============================================================
+   GAME ENTITIES & LOGIC
+============================================================ */
+class Tower {
+  constructor({x, z, isKing, owner}) {
+    this.x = x; this.z = z; this.y = 0;
+    this.isKing = isKing;
+    this.owner = owner; // 'P1' or 'P2'
+    this.maxHp = isKing ? 3800 : 2300;
+    this.hp = this.maxHp;
+    this.range = isKing ? 6.2 : 6.0;
+    this.dps = isKing ? 120 : 90;
+    this.cooldown = 0;
+    this.destroyed = false;
+    // More detailed tower model
+    const baseGeo = new THREE.CylinderGeometry(isKing?1.1:0.9, isKing?1.3:1.1, isKing?1.0:0.8, 16);
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: isKing ? 0xffcf40 : (owner==='P1' ? 0x9ad0ff : 0xff9aaa),
+      roughness: 0.7,
+      metalness: 0.15
+    });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    
+    const towerGeo = new THREE.CylinderGeometry(isKing?0.8:0.6, isKing?1.0:0.8, isKing?1.2:1.0, 16);
+    const towerMat = new THREE.MeshStandardMaterial({
+      color: isKing ? 0xffe082 : (owner==='P1' ? 0xbbdefb : 0xf8bbd0),
+      roughness: 0.6,
+      metalness: 0.2
+    });
+    const tower = new THREE.Mesh(towerGeo, towerMat);
+    tower.position.y = isKing ? 1.1 : 0.9;
+    
+    // Create a group to hold both parts
+    this.mesh = new THREE.Group();
+    this.mesh.add(base);
+    this.mesh.add(tower);
+    
+    // Add battlements to king's tower
+    if (isKing) {
+      const battlementGeo = new THREE.TorusGeometry(1.0, 0.1, 8, 16);
+      const battlementMat = new THREE.MeshStandardMaterial({
+        color: 0xffe082,
+        roughness: 0.6,
+        metalness: 0.2
+      });
+      const battlement = new THREE.Mesh(battlementGeo, battlementMat);
+      battlement.position.y = 1.8;
+      battlement.rotation.x = Math.PI / 2;
+      this.mesh.add(battlement);
+    }
+    
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
+    this.mesh.position.set(this.x, 0, this.z);
+    scene.add(this.mesh);
+  }
+  alive() { return this.hp > 0 && !this.destroyed; }
+  screenPos() { return worldToScreen(this.mesh.position); }
+}
+class Unit {
+  constructor(troop, owner, laneIndex, spawnPos) {
+    this.troop = troop;
+    this.owner = owner; // 'P1' or 'P2'
+    this.laneIndex = laneIndex;
+    this.pos = new THREE.Vector3(spawnPos.x, 0.3, spawnPos.z);
+    this.dir = (owner==='P1') ? -1 : 1; // direction along Z (P1 -> up(-), P2 -> down(+))
+    this.hp = troop.hp;
+    this.target = null;
+    this.cooldown = 0;
+    this.speed = troop.speed; // world units per second (tuned)
+    this.model = this.makeModel();
+    this.path = []; // Path to follow for lane-based movement
+    this.pathIndex = 0; // Current position in path
+    this.assignedLane = laneIndex; // Lane assigned to this unit
+    this.canAttackKing = false; // Can only attack king after defeating princess tower
+    this.state = 'moving'; // 'moving', 'attacking', 'turning'
+    this.turnProgress = 0; // For smooth turning animation
+  }
+  makeModel() {
+    // Create a sprite with the troop's emoji
+    const canvas = document.createElement('canvas');
+    const size = 64;
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    
+    // Draw background circle
+    context.fillStyle = `#${this.troop.color.toString(16).padStart(6, '0')}`;
+    context.beginPath();
+    context.arc(size/2, size/2, size/2 - 4, 0, 2 * Math.PI);
+    context.fill();
+    
+    // Draw emoji
+    context.font = '40px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(this.troop.sprite, size/2, size/2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.2, 1.2, 1.0);
+    sprite.position.copy(this.pos);
+    scene.add(sprite);
+    return sprite;
+  }
+  alive() { return this.hp > 0; }
+  screenPos() { return worldToScreen(this.model.position); }
+  distanceTo(obj) {
+    const p = obj.model ? obj.model.position : (obj.mesh ? obj.mesh.position : obj); // Unit or Tower
+    return this.model.position.distanceTo(p);
+  }
+  // Calculate path to follow based on lane assignment
+  calculatePath() {
+    this.path = [];
+    const enemy = this.owner === 'P1' ? 'P2' : 'P1';
+    const laneX = LANES_X[this.assignedLane];
+    
+    // First target: princess tower in this lane
+    const princessTowers = GAME.towers[enemy].filter(t => !t.isKing && 
+        Math.abs(t.x - laneX) < 2.0); // Find tower in this lane
+        
+    if (princessTowers.length > 0 && princessTowers[0].alive()) {
+      // Path to princess tower
+      this.path.push(new THREE.Vector3(laneX, 0, princessTowers[0].z));
+    } else {
+      // If princess tower is destroyed, can attack king's tower
+      this.canAttackKing = true;
+      const kingTower = GAME.towers[enemy].find(t => t.isKing && t.alive());
+      if (kingTower) {
+        // Create a rectangular path:
+        // 1. Move to center of the lane at the river (z=0)
+        // 2. Turn 90 degrees and move to king's tower (x=0)
+        this.path.push(new THREE.Vector3(laneX, 0, 0));
+        this.path.push(new THREE.Vector3(0, 0, kingTower.z));
+      }
+    }
+  }
+}
+const GAME = {
+  towers: { P1: [], P2: [] },
+  units:  [], // array of Unit
+  elixir: { P1: 5, P2: 5 },
+  crowns: { P1: 0, P2: 0 },
+  decks: { // 8-card decks (simple same deck for both)
+    P1: TROOPS.map(t=>t.key),
+    P2: TROOPS.map(t=>t.key),
+  },
+  hands: { P1: [], P2: [] }, // array of keys (size 4)
+  nextIndex: { P1: 4, P2: 4 }, // index in deck to draw after the starting 4
+};
+/* ===== INIT ARENA (towers & hands) ===== */
+function setupArena() {
+  // Clear old
+  GAME.units.forEach(u => scene.remove(u.model));
+  GAME.units = [];
+  [...GAME.towers.P1, ...GAME.towers.P2].forEach(t => scene.remove(t.mesh));
+  GAME.towers.P1 = [];
+  GAME.towers.P2 = [];
+  GAME.elixir = { P1: 5, P2: 5 };
+  GAME.crowns = { P1: 0, P2: 0 };
+  STATE.stats = { unitsDeployed: 0, towersDestroyed: 0, damageDealt: 0 };
+  // P1 towers (bottom side, z > 0) - positioned like in Clash Royale
+  GAME.towers.P1.push(new Tower({ x: LANES_X[0], z:  7.5, isKing: false, owner: 'P1' }));
+  GAME.towers.P1.push(new Tower({ x: 0, z:  10.0, isKing:  true, owner: 'P1' }));
+  GAME.towers.P1.push(new Tower({ x: LANES_X[1], z:  7.5, isKing: false, owner: 'P1' }));
+  // P2 towers (top side, z < 0)
+  GAME.towers.P2.push(new Tower({ x: LANES_X[0], z: -7.5, isKing: false, owner: 'P2' }));
+  GAME.towers.P2.push(new Tower({ x: 0, z: -10.0, isKing:  true, owner: 'P2' }));
+  GAME.towers.P2.push(new Tower({ x: LANES_X[1], z: -7.5, isKing: false, owner: 'P2' }));
+  // Shuffle decks & draw hands
+  GAME.decks.P1 = shuffle([...GAME.decks.P1]);
+  GAME.decks.P2 = shuffle([...GAME.decks.P2]);
+  GAME.hands.P1 = GAME.decks.P1.slice(0, HAND_SIZE);
+  GAME.hands.P2 = GAME.decks.P2.slice(0, HAND_SIZE);
+  GAME.nextIndex.P1 = HAND_SIZE;
+  GAME.nextIndex.P2 = HAND_SIZE;
+  updateHandsUI();
+  updateCrownsUI();
+  updateElixirUI();
+  updateGameStats();
+  
+  // Setup lane selection UI
+  setupLaneSelection();
+}
+function setupLaneSelection() {
+  const laneSelection = document.getElementById('laneSelection');
+  laneSelection.classList.remove('hidden');
+  
+  // Clear existing event listeners
+  const buttons = laneSelection.querySelectorAll('.laneBtn');
+  buttons.forEach(btn => {
+    btn.replaceWith(btn.cloneNode(true));
+  });
+  
+  // Add new event listeners
+  laneSelection.querySelectorAll('.laneBtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lane = parseInt(btn.dataset.lane);
+      STATE.selectedLane = lane;
+      
+      // Update UI
+      laneSelection.querySelectorAll('.laneBtn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.lane) === lane);
+      });
+    });
+  });
+  
+  // Set initial active state
+  laneSelection.querySelector(`.laneBtn[data-lane="${STATE.selectedLane}"]`).classList.add('active');
+}
+/* ============================================================
+   UI: HANDS / ELIXIR / TIMER / CROWNS
+============================================================ */
+const p1Hand = document.getElementById('p1Hand');
+const p2Hand = document.getElementById('p2Hand');
+const p1Fill = document.getElementById('p1ElixirFill');
+const p2Fill = document.getElementById('p2ElixirFill');
+const timerBox = document.getElementById('timerBox');
+const phaseBox = document.getElementById('phaseBox');
+const topControls = document.getElementById('topControls');
+const bottomControls = document.getElementById('bottomControls');
+function updateHandsUI() {
+  // Clear
+  p1Hand.innerHTML = '';
+  p2Hand.innerHTML = '';
+  // Build cards
+  GAME.hands.P1.forEach(key => {
+    const t = TROOP_BY_KEY[key];
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.draggable = true;
+    c.innerHTML = `<div>${t.name}</div><div class="cost">${t.cost}</div>`;
+    // drag events
+    c.addEventListener('dragstart', (e)=>onDragStart(e, 'P1', key));
+    c.addEventListener('dragend',   (e)=>onDragEnd(e));
+    c.addEventListener('click', ()=>quickPlay('P1', key));
+    if (GAME.elixir.P1 < t.cost || STATE.gameOver) c.classList.add('disabled');
+    p1Hand.appendChild(c);
+  });
+  // For Multiplayer: show P2 hand at top. For Bot: show disabled AI cards (or hide).
+  if (STATE.mode === 'multi') {
+    GAME.hands.P2.forEach(key => {
+      const t = TROOP_BY_KEY[key];
+      const c = document.createElement('div');
+      c.className = 'card';
+      c.draggable = true;
+      c.innerHTML = `<div>${t.name}</div><div class="cost">${t.cost}</div>`;
+      c.addEventListener('dragstart', (e)=>onDragStart(e, 'P2', key));
+      c.addEventListener('dragend',   (e)=>onDragEnd(e));
+      c.addEventListener('click', ()=>quickPlay('P2', key));
+      if (GAME.elixir.P2 < t.cost || STATE.gameOver) c.classList.add('disabled');
+      p2Hand.appendChild(c);
+    });
+  } else {
+    // Show AI hand but disabled (optional): comment out to hide entirely
+    GAME.hands.P2.forEach(key => {
+      const t = TROOP_BY_KEY[key];
+      const c = document.createElement('div');
+      c.className = 'card disabled';
+      c.innerHTML = `<div>${t.name}</div><div class="cost">${t.cost}</div>`;
+      p2Hand.appendChild(c);
+    });
+  }
+}
+function updateElixirUI() {
+  p1Fill.style.width = `${(GAME.elixir.P1 / MAX_ELIXIR) * 100}%`;
+  p2Fill.style.width = `${(GAME.elixir.P2 / MAX_ELIXIR) * 100}%`;
+  // also toggle disabled on cards
+  [...p1Hand.children].forEach((c,i)=>{
+    const t = TROOP_BY_KEY[GAME.hands.P1[i]];
+    c.classList.toggle('disabled', GAME.elixir.P1 < t.cost || STATE.gameOver);
+  });
+  if (STATE.mode==='multi') {
+    [...p2Hand.children].forEach((c,i)=>{
+      const t = TROOP_BY_KEY[GAME.hands.P2[i]];
+      c.classList.toggle('disabled', GAME.elixir.P2 < t.cost || STATE.gameOver);
+    });
+  }
+}
+function updateCrownsUI() {
+  const map = [
+    ['p1c1', GAME.crowns.P1>=1], ['p1c2', GAME.crowns.P1>=2], ['p1c3', GAME.crowns.P1>=3],
+    ['p2c1', GAME.crowns.P2>=1], ['p2c2', GAME.crowns.P2>=2], ['p2c3', GAME.crowns.P2>=3],
+  ];
+  map.forEach(([id,filled])=>{
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('filled', !!filled);
+  });
+}
+function setPhaseLabel() {
+  const { elapsed, baseTime, inOvertime } = STATE;
+  let label = PHASES.REGULAR;
+  if (!inOvertime) {
+    if (elapsed >= 120) label = PHASES.DOUBLE; // last minute of regular
+  } else {
+    const ot = elapsed - baseTime;
+    label = (ot < 60) ? PHASES.DOUBLE : PHASES.TRIPLE;
+  }
+  phaseBox.textContent = label + (STATE.inOvertime ? ' OT' : '');
+}
+function formatTimeLeft() {
+  const { elapsed, baseTime, overtimeTime, inOvertime } = STATE;
+  const total = baseTime + (inOvertime ? overtimeTime : 0);
+  const left = Math.max(0, Math.floor(total - elapsed));
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function updateGameStats() {
+  document.getElementById('unitCount').textContent = GAME.units.length;
+  document.getElementById('towerCount').textContent = 
+    GAME.towers.P1.filter(t => t.alive()).length + 
+    GAME.towers.P2.filter(t => t.alive()).length;
+  
+  const minutes = Math.floor(STATE.elapsed / 60);
+  const seconds = Math.floor(STATE.elapsed % 60);
+  document.getElementById('gameTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+/* ============================================================
+   DRAG & DEPLOY
+============================================================ */
+let dragPayload = null; // { owner, key }
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+function onDragStart(e, owner, key) {
+  if (STATE.gameOver) { e.preventDefault(); return; }
+  dragPayload = { owner, key };
+  e.dataTransfer.setDragImage(new Image(), 0, 0);
+  // highlight deploy zone
+  drawOverlayZone(owner);
+}
+function onDragEnd(_) {
+  dragPayload = null;
+  clearOverlay();
+}
+overlay2D.addEventListener('dragover', (e)=>{
+  e.preventDefault();
+});
+overlay2D.addEventListener('drop', (e)=>{
+  e.preventDefault();
+  if (!dragPayload) return;
+  const { owner, key } = dragPayload;
+  const world = screenToWorld(e.clientX, e.clientY);
+  if (!world) return;
+  // Validate deploy zone
+  if (!canDeployAt(owner, world)) return;
+  // Use selected lane instead of nearest lane
+  const laneIndex = STATE.selectedLane;
+  tryPlayCard(owner, key, laneIndex, world);
+  dragPayload = null;
+  clearOverlay();
+});
+function quickPlay(owner, key) {
+  // Click-to-play: center of nearest allowed half at lane center, mid-depth
+  if (STATE.gameOver) return;
+  const halfZ = (owner==='P1') ? (DEPLOY_Z.P1_MIN + DEPLOY_Z.P1_MAX)/2 : (DEPLOY_Z.P2_MIN + DEPLOY_Z.P2_MAX)/2;
+  const laneIndex = STATE.selectedLane;
+  const pos = new THREE.Vector3(LANES_X[laneIndex], 0, halfZ);
+  tryPlayCard(owner, key, laneIndex, pos);
+}
+function tryPlayCard(owner, key, laneIndex, posVec) {
+  const deck = GAME.decks[owner];
+  const hand = GAME.hands[owner];
+  const elixir = GAME.elixir[owner];
+  const troop = TROOP_BY_KEY[key];
+  if (!troop) return;
+  if (elixir < troop.cost) return;
+  // spend
+  GAME.elixir[owner] = Math.max(0, elixir - troop.cost);
+  updateElixirUI();
+  // spawn unit
+  spawnUnit(owner, key, laneIndex, posVec);
+  STATE.stats.unitsDeployed++;
+  updateGameStats();
+  // cycle card
+  const idx = hand.indexOf(key);
+  if (idx>=0) {
+    const next = deck[ GAME.nextIndex[owner] % DECK_SIZE ];
+    hand.splice(idx, 1, next);
+    GAME.nextIndex[owner] = (GAME.nextIndex[owner] + 1) % DECK_SIZE;
+    updateHandsUI();
+  }
+  // Notify AI (counter logic)
+  if (STATE.mode==='bot' && owner==='P1') botReactToPlay(key, laneIndex);
+}
+function canDeployAt(owner, worldPos) {
+  const z = worldPos.z;
+  if (owner==='P1') return (z >= DEPLOY_Z.P1_MIN && z <= DEPLOY_Z.P1_MAX);
+  else              return (z >= DEPLOY_Z.P2_MIN && z <= DEPLOY_Z.P2_MAX);
+}
+function drawOverlayZone(owner) {
+  clearOverlay();
+  octx.fillStyle = 'rgba(76, 201, 240, 0.10)';
+  octx.strokeStyle = 'rgba(76, 201, 240, 0.35)';
+  octx.lineWidth = 3;
+  const w = overlay2D.width, h = overlay2D.height;
+  if (owner==='P1') {
+    octx.fillRect(0, h*0.5, w, h*0.5);
+    octx.strokeRect(0, h*0.5, w, h*0.5);
+  } else {
+    octx.fillRect(0, 0, w, h*0.5);
+    octx.strokeRect(0, 0, w, h*0.5);
+  }
+}
+function clearOverlay(){ octx.clearRect(0,0,overlay2D.width,overlay2D.height); }
+/* ============================================================
+   RENDER HELPERS (world<->screen)
+============================================================ */
+function worldToScreen(vec3) {
+  const v = vec3.clone();
+  v.project(camera);
+  return {
+    x: (v.x * 0.5 + 0.5) * window.innerWidth,
+    y: ( -v.y * 0.5 + 0.5 ) * window.innerHeight
+  };
+}
+function screenToWorld(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((clientX - rect.left)/rect.width) * 2 - 1;
+  mouse.y = -((clientY - rect.top)/rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const plane = scene.children.find(o=>o.name==='arenaPlane');
+  const hits = raycaster.intersectObject(plane);
+  if (hits.length>0) {
+    const p = hits[0].point;
+    return new THREE.Vector3( clamp(p.x, -ARENA.width/2, ARENA.width/2),
+                              0,
+                              clamp(p.z, -ARENA.height/2, ARENA.height/2) );
+  }
+  return null;
+}
+function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+/* ============================================================
+   SPAWNING / TARGETING / COMBAT
+============================================================ */
+function spawnUnit(owner, key, laneIndex, pos) {
+  const t = TROOP_BY_KEY[key];
+  const u = new Unit(t, owner, laneIndex, pos);
+  u.assignedLane = laneIndex; // Use the assigned lane
+  u.calculatePath(); // Calculate path for this unit
+  
+  // Add spawn animation
+  u.model.scale.set(0.1, 0.1, 0.1);
+  const targetScale = 1.2;
+  const startTime = Date.now();
+  const duration = 300;
+
+  function animateSpawn() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const scale = 0.1 + (targetScale - 0.1) * progress;
+    u.model.scale.set(scale, scale, scale);
+    if (progress < 1) {
+      requestAnimationFrame(animateSpawn);
+    }
+  }
+  animateSpawn();
+  
+  GAME.units.push(u);
+  return u;
+}
+function enemyOf(owner){ return owner==='P1' ? 'P2' : 'P1'; }
+function getAllTargetsFor(owner) {
+  // Enemy units + alive towers
+  const enemy = enemyOf(owner);
+  const list = GAME.units.filter(u=>u.owner===enemy && u.alive());
+  const towers = GAME.towers[enemy].filter(t=>t.alive());
+  return [...list, ...towers];
+}
+function chooseTarget(unit) {
+  const enemy = enemyOf(unit.owner);
+  
+  // First, check if there are enemy units in the same lane
+  const enemyUnits = GAME.units.filter(u => 
+    u.owner === enemy && 
+    u.alive() && 
+    Math.abs(u.model.position.x - LANES_X[unit.assignedLane]) < 2.5
+  );
+  
+  if (enemyUnits.length > 0) {
+    // Find the closest enemy unit in the same lane
+    let closest = null;
+    let minDist = Infinity;
+    
+    for (const enemyUnit of enemyUnits) {
+      const dist = unit.model.position.distanceTo(enemyUnit.model.position);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = enemyUnit;
+      }
+    }
+    
+    return closest;
+  }
+  
+  // If no enemy units in lane, target towers in this lane
+  const laneX = LANES_X[unit.assignedLane];
+  const towersInLane = GAME.towers[enemy].filter(t => 
+    t.alive() && 
+    Math.abs(t.x - laneX) < 2.5
+  );
+  
+  if (towersInLane.length > 0) {
+    // Only target princess towers unless canAttackKing is true
+    const princessTower = towersInLane.find(t => !t.isKing);
+    if (princessTower) return princessTower;
+    
+    // If no princess tower and can attack king, target king's tower
+    if (unit.canAttackKing) {
+      const kingTower = towersInLane.find(t => t.isKing);
+      if (kingTower) return kingTower;
+    }
+  }
+  
+  // Fallback: target any enemy unit
+  const anyEnemyUnit = GAME.units.find(u => u.owner === enemy && u.alive());
+  if (anyEnemyUnit) return anyEnemyUnit;
+  
+  // Final fallback: target any enemy tower (only if canAttackKing is true for king's tower)
+  const availableTowers = GAME.towers[enemy].filter(t => 
+    t.alive() && (unit.canAttackKing || !t.isKing)
+  );
+  if (availableTowers.length > 0) return availableTowers[0];
+  
+  return null;
+}
+function tickUnits(dt) {
+  // Filter dead
+  GAME.units = GAME.units.filter(u=>u.alive());
+  for (const u of GAME.units) {
+    // Recalculate path if needed (if target tower was destroyed)
+    if (u.path.length === 0 || 
+        (u.target && u.target.alive && !u.target.alive())) {
+      u.calculatePath();
+    }
+    
+    if (!u.target || (u.target.alive && !u.target.alive())) {
+      u.target = chooseTarget(u);
+    }
+    
+    if (!u.target) continue;
+    
+    // Get target position
+    const targetPos = u.target.model ? u.target.model.position : u.target.mesh.position;
+    const dist = u.model.position.distanceTo(targetPos);
+    const inRange = dist <= u.troop.range;
+    
+    if (inRange) {
+      // Attack
+      u.state = 'attacking';
+      u.cooldown -= dt;
+      if (u.cooldown <= 0) {
+        // Create attack effect
+        createAttackEffect(u.model.position, u.troop.color);
+        
+        // Simple DPS tick model (burst every ~0.7s)
+        const burst = 0.7;
+        let dmg = u.troop.atk;
+        STATE.stats.damageDealt += dmg;
+        
+        // Splash (small radius) for Wizard/Bomber/Valk spin
+        if (u.troop.splash || u.troop.spin) {
+          const splashR = u.troop.spin ? 2.2 : 1.5;
+          // affect multiple enemies around the target
+          const enemies = GAME.units.filter(e=>e.owner!==u.owner && e.alive());
+          let hit = 0;
+          for (const e of enemies) {
+            const d = e.model.position.distanceTo(targetPos);
+            if (d <= splashR) { 
+              e.hp -= dmg; 
+              hit++; 
+              createAttackEffect(e.model.position, u.troop.color);
+            }
+          }
+          // Also splash towers if target is tower and in radius
+          GAME.towers[enemyOf(u.owner)].forEach(t=>{
+            if (!t.alive()) return;
+            if (t.mesh.position.distanceTo(targetPos) <= splashR) {
+              t.hp -= dmg*0.8;
+              createAttackEffect(t.mesh.position, u.troop.color);
+            }
+          });
+        } else {
+          if (u.target instanceof Unit) {
+            u.target.hp -= dmg;
+            createAttackEffect(u.target.model.position, u.troop.color);
+          } else {
+            u.target.hp -= dmg;
+            createAttackEffect(u.target.mesh.position, u.troop.color);
+          }
+        }
+        u.cooldown = burst;
+      }
+    } else {
+      // Move along path
+      u.state = 'moving';
+      
+      if (u.path.length > 0 && u.pathIndex < u.path.length) {
+        const targetPoint = u.path[u.pathIndex];
+        const distanceToPoint = u.model.position.distanceTo(targetPoint);
+        
+        if (distanceToPoint < 0.5) {
+          u.pathIndex++;
+          if (u.pathIndex >= u.path.length) {
+            // Reached the end of the path, clear it
+            u.path = [];
+            u.pathIndex = 0;
+            // Recalculate path because we might have a new target now
+            u.calculatePath();
+          }
+        } else {
+          // Move towards the current path point
+          const direction = new THREE.Vector3().subVectors(targetPoint, u.model.position).normalize();
+          
+          // If we need to turn (when moving from lane to king tower)
+          if (u.pathIndex === 1 && u.canAttackKing) {
+            // Smooth turning animation
+            u.turnProgress += dt * 2; // Adjust turning speed
+            if (u.turnProgress > 1) u.turnProgress = 1;
+            
+            // Interpolate between lane direction and center direction
+            const laneDir = new THREE.Vector3(0, 0, u.dir);
+            const centerDir = new THREE.Vector3(
+              u.owner === 'P1' ? -1 : 1, // X direction towards center
+              0,
+              0
+            ).normalize();
+            
+            const turnDirection = laneDir.clone().lerp(centerDir, u.turnProgress);
+            u.model.position.add(turnDirection.multiplyScalar(u.speed * dt));
+          } else {
+            u.model.position.add(direction.multiplyScalar(u.speed * dt));
+          }
+        }
+      } else {
+        // No path, move towards target
+        const direction = new THREE.Vector3().subVectors(targetPos, u.model.position).normalize();
+        u.model.position.add(direction.multiplyScalar(u.speed * dt));
+      }
+    }
+    
+    // Sync model height (tiny bounce feel)
+    u.model.position.y = 0.3 + 0.02 * Math.sin(performance.now()/150 + u.model.id);
+    u.pos.copy(u.model.position);
+  }
+}
+function tickTowers(dt) {
+  // Each alive tower shoots nearest enemy in range
+  ['P1','P2'].forEach(owner=>{
+    for (const t of GAME.towers[owner]) {
+      if (!t.alive()) continue;
+      t.cooldown -= dt;
+      const enemies = GAME.units.filter(u=>u.owner!==owner && u.alive());
+      let best = null, bestD = Infinity;
+      for (const e of enemies) {
+        const d = t.mesh.position.distanceTo(e.model.position);
+        if (d < bestD && d <= t.range) { best = e; bestD = d; }
+      }
+      if (best && t.cooldown <= 0) {
+        // shoot burst every ~0.8s
+        best.hp -= t.dps;
+        createAttackEffect(best.model.position, 0xff0000);
+        t.cooldown = 0.8;
+      }
+    }
+  });
+}
+function removeDeadEntities() {
+  // Remove dead units meshes
+  for (const u of GAME.units) {
+    if (u.hp <= 0) {
+      scene.remove(u.model);
+      u.model.material.map.dispose();
+      u.model.material.dispose();
+      GAME.units = GAME.units.filter(unit => unit !== u);
+      
+      // Create death effect
+      createDeathEffect(u.model.position);
+    }
+  }
+}
+/* ============================================================
+   CROWNS / WIN CHECK
+============================================================ */
+function aliveTowers(owner) { return GAME.towers[owner].filter(t=>t.alive()); }
+function kingTower(owner) {
+  return GAME.towers[owner].find(t=>t.isKing);
+}
+function princessTowers(owner) {
+  return GAME.towers[owner].filter(t=>!t.isKing);
+}
+function checkTowerFalls() {
+  // Count destroyed towers and crowns, instant 3-crown if king falls
+  ['P1','P2'].forEach(owner=>{
+    const enemy = enemyOf(owner);
+    for (const t of GAME.towers[enemy]) {
+      if (t.hp<=0 && !t.destroyed) {
+        // mark as destroyed
+        t.destroyed = true;
+        t.mesh.visible = false;
+        STATE.stats.towersDestroyed++;
+        updateGameStats();
+        
+        // Create explosion effect
+        createExplosion(t.mesh.position, t.isKing);
+        
+        // If a princess tower was destroyed, allow units to attack king
+        if (!t.isKing) {
+          // Find all units that were targeting this tower and recalculate their paths
+          GAME.units.forEach(u => {
+            if (u.target === t) {
+              u.target = null;
+              u.calculatePath();
+            }
+          });
+        }
+        
+        // crown to 'owner'
+        GAME.crowns[owner] = Math.min(3, GAME.crowns[owner] + (t.isKing? (3 - GAME.crowns[owner]) : 1));
+        updateCrownsUI();
+        // king down? instant 3-crown win
+        if (t.isKing) {
+          endGame(owner, `${owner==='P1'?'You':'Enemy'} destroyed King's Tower!`);
+        } else if (STATE.inOvertime && STATE.suddenDeath) {
+          // Sudden death - first tower down wins
+          endGame(owner, `Sudden Death: ${owner==='P1'?'You':'Enemy'} take the tower!`);
+        }
+      }
+    }
+  });
+}
+function endGame(winner, message) {
+  if (STATE.gameOver) return;
+  STATE.gameOver = true;
+  const banner = document.getElementById('resultBanner');
+  banner.style.display = 'flex';
+  banner.style.color = winner==='P1' ? 'var(--success)' : 'var(--danger)';
+  banner.innerHTML = `
+    <div style="text-align: center;">
+      <div>${message}</div>
+      <div style="font-size: 32px; margin-top: 10px;">${winner==='P1'?'Victory!':'Defeat!'}</div>
+      <div style="margin-top: 20px;">
+        <button class="btn gold" onclick="location.reload()">Play Again</button>
+        <button class="btn" onclick="showStats()">Game Stats</button>
+      </div>
+    </div>
+  `;
+}
+/* ============================================================
+   ELIXIR (Normal → Double → Triple)
+============================================================ */
+function currentElixirRate() {
+  // Base CR approx: 1 elixir / 2.8s ≈ 0.357/s
+  // Double: 0.714/s, Triple: 1.071/s
+  const { elapsed, baseTime, inOvertime } = STATE;
+  if (!inOvertime) {
+    if (elapsed >= 120) return 0.714; // last 60s of regular time
+    return 0.357;
+  } else {
+    const ot = elapsed - baseTime;
+    if (ot < 60) return 0.714; // first 60s of OT
+    return 1.071;              // last 60s of OT (triple)
+  }
+}
+function tickElixir(dt) {
+  const rate = currentElixirRate();
+  ['P1','P2'].forEach(owner=>{
+    GAME.elixir[owner] = Math.min(MAX_ELIXIR, GAME.elixir[owner] + rate*dt);
+  });
+  updateElixirUI();
+}
+/* ============================================================
+   AI (SMART COUNTERS) — difficulty scales
+============================================================ */
+const AI = {
+  cooldown: 0,
+  aggressTimer: 0,
+  params() {
+    return { reactDelay: 0.65, minElixir: 2, pushFreq: 5.0, wasteChance: 0.05 };
+  }
+};
+// Called when player plays a card, bot tries to counter appropriately
+function botReactToPlay(playerKey, laneIndex) {
+  if (STATE.mode!=='bot' || STATE.gameOver) return;
+  const p = AI.params();
+  const wait = p.reactDelay + Math.random()*0.3;
+  setTimeout(()=>{
+    if (STATE.gameOver) return;
+    // choose counter set
+    let picks = [];
+    if (playerKey==='giant') {
+      picks = ['mini','goblin']; // DPS vs tank
+    } else if (playerKey==='goblin') {
+      picks = ['valk'];          // splash
+    } else if (playerKey==='knight') {
+      picks = ['mini'];          // heavy single-target
+    } else if (playerKey==='archer') {
+      picks = ['knight'];        // soak
+    } else if (playerKey==='wizard' || playerKey==='bomber') {
+      picks = ['mini'];          // kill the backline
+    } else if (playerKey==='valk') {
+      picks = ['wizard'];        // ranged DPS
+    } else {
+      picks = ['knight'];
+    }
+    // deploy where? Slightly back from bridge on bot side
+    const laneX = LANES_X[laneIndex];
+    const pos = new THREE.Vector3(laneX, 0, -3.8); // bot half (P2)
+    // Try to play the sequence if elixir allows
+    for (const key of picks) {
+      const t = TROOP_BY_KEY[key];
+      if (GAME.elixir.P2 >= t.cost) {
+        tryPlayCard('P2', key, laneIndex, pos.clone());
+      }
+    }
+  }, wait*1000);
+}
+// Periodic proactive pushes
+function botProactive(dt) {
+  if (STATE.mode!=='bot' || STATE.gameOver) return;
+  AI.aggressTimer -= dt;
+  if (AI.aggressTimer <= 0) {
+    const p = AI.params();
+    AI.aggressTimer = p.pushFreq + (Math.random()*1.5 - 0.75);
+    if (GAME.elixir.P2 < p.minElixir) return;
+    // Choose a lane with fewer enemy units near bridge (simple read)
+    const lanesPressure = [0,1].map(i=>{
+      const near = GAME.units.filter(u=>u.owner==='P1' && Math.abs(u.model.position.z) < 3.0 && Math.abs(u.model.position.x - LANES_X[i]) < 2.2);
+      return near.length;
+    });
+    let lane = lanesPressure.indexOf(Math.min(...lanesPressure));
+    if (lane<0) lane = Math.floor(Math.random()*2);
+    const pos = new THREE.Vector3(LANES_X[lane], 0, -4.2);
+    // Compose a push by difficulty
+    const roll = Math.random();
+    if (roll<0.5 && GAME.elixir.P2>=7) {
+      tryPlayCard('P2', 'knight', lane, pos);
+      tryPlayCard('P2', 'archer', lane, pos);
+    } else if (GAME.elixir.P2>=5) {
+      tryPlayCard('P2', 'valk', lane, pos);
+    } else {
+      // easy: cheap random
+      const opts = ['knight','goblin','archer','bomber'];
+      const key = opts[Math.floor(Math.random()*opts.length)];
+      const t = TROOP_BY_KEY[key];
+      if (GAME.elixir.P2 >= t.cost) tryPlayCard('P2', key, lane, pos);
+    }
+  }
+}
+/* ============================================================
+   HP BARS (2D overlay above 3D)
+============================================================ */
+function drawHPBars() {
+  hctx.clearRect(0,0,hpCanvas.width,hpCanvas.height);
+  // Units
+  for (const u of GAME.units) {
+    const sp = u.screenPos();
+    const pct = clamp(u.hp / u.troop.hp, 0, 1);
+    drawBar(sp.x, sp.y - 12, 26, 4, pct, u.owner==='P1' ? '#32cd32' : '#ff6565');
+  }
+  // Towers
+  for (const owner of ['P1','P2']) {
+    for (const t of GAME.towers[owner]) {
+      if (!t.alive()) continue;
+      const sp = t.screenPos();
+      const pct = clamp(t.hp / t.maxHp, 0, 1);
+      drawBar(sp.x, sp.y - 18, 46, 6, pct, t.isKing ? '#ffd54a' : (owner==='P1' ? '#67e8f9' : '#fca5a5'));
+    }
+  }
+}
+function drawBar(x,y,w,h,pct,color) {
+  const r = 6;
+  hctx.save();
+  hctx.beginPath();
+  hctx.fillStyle = 'rgba(0,0,0,0.55)';
+  roundRect(hctx, x-w/2, y-h/2, w, h, 4);
+  hctx.fill();
+  // fill
+  const fw = Math.max(2, (w-2) * pct);
+  hctx.fillStyle = color;
+  roundRect(hctx, x-w/2+1, y-h/2+1, fw, h-2, 4);
+  hctx.fill();
+  hctx.restore();
+}
+function roundRect(ctx,x,y,w,h,r){
+  if (w<2*r) r=w/2; if (h<2*r) r=h/2;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+/* ============================================================
+   MINIMAP
+============================================================ */
+function updateMinimap() {
+  mctx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+  
+  // Draw arena
+  mctx.fillStyle = '#2e7d32';
+  mctx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+  
+  // Draw river
+  mctx.fillStyle = '#2d4b8f';
+  mctx.fillRect(0, minimapCanvas.height/2 - 10, minimapCanvas.width, 20);
+  
+  // Draw bridges
+  mctx.fillStyle = '#8b5a2b';
+  mctx.fillRect(minimapCanvas.width/2 - 20, minimapCanvas.height/2 - 10, 40, 20);
+  
+  // Draw towers
+  GAME.towers.P1.forEach(tower => {
+    mctx.fillStyle = tower.isKing ? '#ffd54a' : '#67e8f9';
+    const x = (tower.x + ARENA.width/2) / ARENA.width * minimapCanvas.width;
+    const z = (tower.z + ARENA.height/2) / ARENA.height * minimapCanvas.height;
+    mctx.beginPath();
+    mctx.arc(x, z, tower.isKing ? 6 : 4, 0, Math.PI * 2);
+    mctx.fill();
+  });
+
+  GAME.towers.P2.forEach(tower => {
+    mctx.fillStyle = tower.isKing ? '#ffd54a' : '#fca5a5';
+    const x = (tower.x + ARENA.width/2) / ARENA.width * minimapCanvas.width;
+    const z = (tower.z + ARENA.height/2) / ARENA.height * minimapCanvas.height;
+    mctx.beginPath();
+    mctx.arc(x, z, tower.isKing ? 6 : 4, 0, Math.PI * 2);
+    mctx.fill();
+  });
+  
+  // Draw units
+  GAME.units.forEach(unit => {
+    mctx.fillStyle = unit.owner === 'P1' ? '#32cd32' : '#ff6565';
+    const x = (unit.model.position.x + ARENA.width/2) / ARENA.width * minimapCanvas.width;
+    const z = (unit.model.position.z + ARENA.height/2) / ARENA.height * minimapCanvas.height;
+    mctx.beginPath();
+    mctx.arc(x, z, 3, 0, Math.PI * 2);
+    mctx.fill();
+  });
+}
+/* ============================================================
+   VISUAL EFFECTS
+============================================================ */
+function createAttackEffect(position, color) {
+  const effect = document.createElement('div');
+  effect.className = 'attackEffect';
+  effect.style.backgroundColor = `#${color.toString(16).padStart(6, '0')}`;
+  
+  const screenPos = worldToScreen(position);
+  effect.style.left = `${screenPos.x - 15}px`;
+  effect.style.top = `${screenPos.y - 15}px`;
+  
+  document.body.appendChild(effect);
+  
+  setTimeout(() => {
+    document.body.removeChild(effect);
+  }, 500);
+}
+
+function createDeathEffect(position) {
+  const particleCount = 15;
+  
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    particle.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 60%)`;
+    
+    const screenPos = worldToScreen(position);
+    particle.style.left = `${screenPos.x}px`;
+    particle.style.top = `${screenPos.y}px`;
+    
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    document.body.appendChild(particle);
+    
+    let opacity = 1;
+    let posX = screenPos.x;
+    let posY = screenPos.y;
+    
+    const animateParticle = () => {
+      posX += vx;
+      posY += vy;
+      opacity -= 0.02;
+      
+      particle.style.left = `${posX}px`;
+      particle.style.top = `${posY}px`;
+      particle.style.opacity = opacity;
+      
+      if (opacity > 0) {
+        requestAnimationFrame(animateParticle);
+      } else {
+        document.body.removeChild(particle);
+      }
+    };
+    
+    requestAnimationFrame(animateParticle);
+  }
+}
+
+function createExplosion(position, isKing) {
+  const particleCount = isKing ? 50 : 30;
+  const colors = isKing ? ['#FFD700', '#FFA500', '#FF4500'] : ['#FF6347', '#FF4500', '#DC143C'];
+  
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    particle.style.width = isKing ? '12px' : '8px';
+    particle.style.height = isKing ? '12px' : '8px';
+    
+    const screenPos = worldToScreen(position);
+    particle.style.left = `${screenPos.x}px`;
+    particle.style.top = `${screenPos.y}px`;
+    
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * (isKing ? 6 : 4);
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    document.body.appendChild(particle);
+    
+    let opacity = 1;
+    let posX = screenPos.x;
+    let posY = screenPos.y;
+    let size = isKing ? 12 : 8;
+    
+    const animateParticle = () => {
+      posX += vx;
+      posY += vy;
+      opacity -= 0.015;
+      size *= 0.97;
+      
+      particle.style.left = `${posX}px`;
+      particle.style.top = `${posY}px`;
+      particle.style.opacity = opacity;
+      particle.style.width = `${size}px`;
+      particle.style.height = `${size}px`;
+      
+      if (opacity > 0) {
+        requestAnimationFrame(animateParticle);
+      } else {
+        document.body.removeChild(particle);
+      }
+    };
+    
+    requestAnimationFrame(animateParticle);
+  }
+}
+/* ============================================================
+   TIMER / PHASES / OVERTIME
+============================================================ */
+function tickTimer(dt) {
+  if (STATE.gameOver) return;
+  STATE.elapsed += dt;
+  // Switch to OT after base time
+  if (!STATE.inOvertime && STATE.elapsed >= STATE.baseTime) {
+    STATE.inOvertime = true;
+    STATE.suddenDeath = true; // first tower down wins
+  }
+  // End after OT
+  if (STATE.inOvertime && STATE.elapsed >= STATE.baseTime + STATE.overtimeTime) {
+    // decide by crowns
+    if (!STATE.gameOver) {
+      const { P1, P2 } = GAME.crowns;
+      if (P1===P2) {
+        // tie-break by total remaining HP of towers (simple)
+        const hp1 = aliveTowers('P1').reduce((a,t)=>a+t.hp,0);
+        const hp2 = aliveTowers('P2').reduce((a,t)=>a+t.hp,0);
+        endGame(hp1>=hp2 ? 'P1' : 'P2', 'Time! Higher total HP wins.');
+      } else {
+        endGame(P1>P2 ? 'P1' : 'P2', 'Time! More crowns wins.');
+      }
+    }
+  }
+  timerBox.textContent = formatTimeLeft();
+  setPhaseLabel();
+  
+  // Show sudden death message
+  if (STATE.inOvertime && STATE.suddenDeath && !STATE.suddenDeathAnnounced) {
+    STATE.suddenDeathAnnounced = true;
+    const suddenDeathEl = document.getElementById('suddenDeath');
+    suddenDeathEl.style.display = 'block';
+    
+    setTimeout(() => {
+      suddenDeathEl.style.display = 'none';
+    }, 3000);
+  }
+}
+/* ============================================================
+   MAIN LOOP
+============================================================ */
+function animate() {
+  const dt = clock.getDelta();
+  if (STATE.started && !STATE.gameOver) {
+    controls.update();
+    tickTimer(dt);
+    tickElixir(dt);
+    // AI proactive pushes
+    if (STATE.mode==='bot') botProactive(dt);
+    // Motion & combat
+    tickUnits(dt);
+    tickTowers(dt);
+    checkTowerFalls();
+    removeDeadEntities();
+    updateGameStats();
+  }
+  // HUD drawing (HP bars, minimap)
+  drawHPBars();
+  updateMinimap();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+/* ============================================================
+   MENU -> START
+============================================================ */
+function selectMode(mode) {
+  STATE.mode = mode;
+  // Start directly with no difficulty selection
+  startGame();
+}
+function startGame() {
+  // Show hands
+  topControls.style.display = 'block';
+  bottomControls.style.display = 'block';
+  // Show surrender button and game stats
+  document.getElementById('surrenderBtn').style.display = 'block';
+  document.getElementById('gameStats').style.display = 'block';
+  
+  // Reset state
+  STATE.started = true;
+  STATE.gameOver = false;
+  STATE.inOvertime = false;
+  STATE.suddenDeath = false;
+  STATE.suddenDeathAnnounced = false;
+  STATE.elapsed = 0;
+  STATE.selectedLane = 0; // Reset to left lane
+  document.getElementById('resultBanner').style.display = 'none';
+  document.getElementById('suddenDeath').style.display = 'none';
+  
+  // Build arena
+  setupArena();
+  
+  // Hide menu
+  document.getElementById('loadingScreen').classList.add('hidden');
+  
+  // show or lock top hand if bot
+  if (STATE.mode==='bot') {
+    // Top hand is visible but disabled; still drawn for symmetry
+  }
+  
+  // Kick loop if first time
+  if (!clock) initThree();
+}
+
+function showStats() {
+  alert(`Game Statistics:
+Units Deployed: ${STATE.stats.unitsDeployed}
+Towers Destroyed: ${STATE.stats.towersDestroyed}
+Damage Dealt: ${STATE.stats.damageDealt}
+Game Time: ${Math.floor(STATE.elapsed / 60)}:${Math.floor(STATE.elapsed % 60).toString().padStart(2, '0')}`);
+}
+
+// Surrender button event
+document.getElementById('surrenderBtn').addEventListener('click', () => {
+  if (STATE.gameOver) return;
+  
+  if (STATE.mode === 'multi') {
+    // In multiplayer, determine who surrenders
+    const surrenderingPlayer = confirm('Are you sure you want to surrender?');
+    if (surrenderingPlayer) {
+      endGame('P2', 'You surrendered!');
+    }
+  } else {
+    // In single player, player surrenders to bot
+    const surrenderingPlayer = confirm('Are you sure you want to surrender?');
+    if (surrenderingPlayer) {
+      endGame('P2', 'You surrendered!');
+    }
+  }
+});
+/* ============================================================
+   UTIL
+============================================================ */
+function shuffle(a){
+  for (let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+/* ============================================================
+   BOOT
+============================================================ */
+initThree();
+animate();
+// expose for menu buttons
+window.selectMode = selectMode;
+window.startGame = startGame;
+window.showStats = showStats;
+/* ============================================================
+   NOTES / CONTROLS
+   - Drag cards from your hand onto your half of the arena to deploy.
+   - Click a card to quick-deploy to a random lane in your half.
+   - Multiplayer: both players have separate hands & elixir.
+     Top player can also drag from top hand onto top half.
+   - OrbitControls is on for fun (pan disabled). You can rotate/zoom a bit.
+============================================================ */
+</script>
+</body>
+</html>
 
